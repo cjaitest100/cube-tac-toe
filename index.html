@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cube Tac Toe</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #1a1a1a;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 1px; }
+  #status {
+    font-size: 17px;
+    margin-bottom: 14px;
+    min-height: 22px;
+    text-align: center;
+    padding: 6px 12px;
+    border-radius: 6px;
+  }
+  #status.x-turn { color: #ff6b6b; }
+  #status.o-turn { color: #6ba6ff; }
+  #status.gameover { color: #ffd84a; font-weight: bold; font-size: 20px; }
+
+  #board {
+    display: grid;
+    grid-template-columns: 150px 360px 150px;
+    grid-template-rows: 90px 360px 90px;
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+  }
+
+  #scene {
+    grid-column: 2;
+    grid-row: 2;
+    width: 360px;
+    height: 360px;
+    perspective: 900px;
+    cursor: grab;
+    touch-action: none;
+  }
+  #scene.dragging { cursor: grabbing; }
+
+  #cube-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+  }
+
+  #cube {
+    width: 180px;
+    height: 180px;
+    position: absolute;
+    top: 90px;
+    left: 90px;
+    transform-style: preserve-3d;
+  }
+
+  .face {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    background: #000;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    backface-visibility: visible;
+  }
+  .face.front  { transform: translateZ(90px); }
+  .face.back   { transform: rotateY(180deg) translateZ(90px); }
+  .face.left   { transform: rotateY(-90deg) translateZ(90px); }
+  .face.right  { transform: rotateY(90deg) translateZ(90px); }
+  .face.up     { transform: rotateX(90deg) translateZ(90px); }
+  .face.down   { transform: rotateX(-90deg) translateZ(90px); }
+
+  .sticker {
+    background: #f5f5f5;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .sticker.X { color: #d8262c; }
+  .sticker.O { color: #2c5fd8; }
+  .sticker.win {
+    background: #ffe884;
+    box-shadow: 0 0 12px #ffb700 inset;
+  }
+
+  /* Button groups */
+  .btn-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .btn-pair { display: flex; gap: 6px; }
+  .group-label {
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  #btns-top    { grid-column: 2; grid-row: 1; flex-direction: row; }
+  #btns-bottom { grid-column: 2; grid-row: 3; flex-direction: row; }
+  #btns-left   { grid-column: 1; grid-row: 2; }
+  #btns-right  { grid-column: 3; grid-row: 2; }
+
+  button.move-btn {
+    background: #2d2d2d;
+    color: #eee;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 7px 11px;
+    font-size: 15px;
+    font-weight: bold;
+    font-family: 'Consolas', monospace;
+    cursor: pointer;
+    min-width: 44px;
+  }
+  button.move-btn:hover:not(:disabled) {
+    background: #3d3d3d;
+    border-color: #888;
+  }
+  button.move-btn:active:not(:disabled) {
+    background: #5a5a5a;
+  }
+  button.move-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  #controls {
+    margin-top: 18px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  #restart {
+    background: #2a5a2a;
+    color: #fff;
+    border: 1px solid #4a8a4a;
+    padding: 9px 18px;
+    font-size: 15px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #restart:hover { background: #3a7a3a; }
+
+  .legend {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    max-width: 640px;
+    line-height: 1.5;
+  }
+  code { background: #2a2a2a; padding: 1px 4px; border-radius: 3px; color: #cfc; }
+</style>
+</head>
+<body>
+
+<h1>CUBE TAC TOE</h1>
+<div id="status"></div>
+
+<div id="board">
+  <div id="btns-top" class="btn-area">
+    <div class="group-label">Up layer (U)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="U">U</button>
+      <button class="move-btn" data-move="U'">U'</button>
+    </div>
+  </div>
+
+  <div id="btns-left" class="btn-area">
+    <div class="group-label">Left layer (L)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="L">L</button>
+      <button class="move-btn" data-move="L'">L'</button>
+    </div>
+    <div class="group-label">Back layer (B)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="B">B</button>
+      <button class="move-btn" data-move="B'">B'</button>
+    </div>
+  </div>
+
+  <div id="scene">
+    <div id="cube-wrapper">
+      <div id="cube"></div>
+    </div>
+  </div>
+
+  <div id="btns-right" class="btn-area">
+    <div class="group-label">Right layer (R)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="R">R</button>
+      <button class="move-btn" data-move="R'">R'</button>
+    </div>
+    <div class="group-label">Front layer (F)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="F">F</button>
+      <button class="move-btn" data-move="F'">F'</button>
+    </div>
+  </div>
+
+  <div id="btns-bottom" class="btn-area">
+    <div class="group-label">Down layer (D)</div>
+    <div class="btn-pair">
+      <button class="move-btn" data-move="D">D</button>
+      <button class="move-btn" data-move="D'">D'</button>
+    </div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="restart">Restart Game</button>
+</div>
+
+<div class="legend">
+  <strong>Drag</strong> the cube to inspect all 6 faces. Each turn: <strong>1)</strong> click an empty sticker to place your mark, then <strong>2)</strong> click a move button to rotate one cube layer. Standard Rubik's notation: <code>U</code>=Up, <code>D</code>=Down, <code>L</code>=Left, <code>R</code>=Right, <code>F</code>=Front, <code>B</code>=Back. Apostrophe (<code>'</code>) means counter-clockwise (when looking at that face from outside). Win by getting 3 marks in a row, column, or diagonal on a single face — checked <em>after</em> the rotation completes.
+</div>
+
+<script>
+(function() {
+  // Face indices: F=0, B=1, L=2, R=3, U=4, D=5
+  const F=0, B=1, L=2, R=3, U=4, D=5;
+  const FACE_NAMES = ['front','back','left','right','up','down'];
+
+  // Move table (verified): face=which face's stickers rotate; dir=+1 CW or -1 CCW from outside;
+  // cycles=4-element edge cycles using flat indices (face*9 + sticker).
+  const MOVES = {
+    "U":  { face: U, dir:+1, cycles: [[0,27,9,18],  [1,28,10,19],  [2,29,11,20]] },
+    "U'": { face: U, dir:-1, cycles: [[0,27,9,18],  [1,28,10,19],  [2,29,11,20]] },
+    "D":  { face: D, dir:+1, cycles: [[6,24,15,33], [7,25,16,34],  [8,26,17,35]] },
+    "D'": { face: D, dir:-1, cycles: [[6,24,15,33], [7,25,16,34],  [8,26,17,35]] },
+    "F":  { face: F, dir:+1, cycles: [[42,27,47,26],[43,30,46,23], [44,33,45,20]] },
+    "F'": { face: F, dir:-1, cycles: [[42,27,47,26],[43,30,46,23], [44,33,45,20]] },
+    "B":  { face: B, dir:+1, cycles: [[38,18,51,35],[37,21,52,32], [36,24,53,29]] },
+    "B'": { face: B, dir:-1, cycles: [[38,18,51,35],[37,21,52,32], [36,24,53,29]] },
+    "R":  { face: R, dir:+1, cycles: [[44,9,53,8],  [41,12,50,5],  [38,15,47,2]] },
+    "R'": { face: R, dir:-1, cycles: [[44,9,53,8],  [41,12,50,5],  [38,15,47,2]] },
+    "L":  { face: L, dir:+1, cycles: [[36,0,45,17], [39,3,48,14],  [42,6,51,11]] },
+    "L'": { face: L, dir:-1, cycles: [[36,0,45,17], [39,3,48,14],  [42,6,51,11]] }
+  };
+
+  // Game state
+  let state = new Array(54).fill(null);  // null | 'X' | 'O'
+  let currentPlayer = 'X';
+  let phase = 'place';                    // 'place' | 'rotate' | 'gameover'
+  let winningCells = [];
+
+  // 3D rotation state
+  let rotX = -25, rotY = -30;
+  let isPointerDown = false;
+  let dragStartX = 0, dragStartY = 0;
+  let dragLastX = 0, dragLastY = 0;
+  let dragMoved = false;
+
+  // ---- Cube move logic ----
+
+  function applyCycle(arr, indices, dir) {
+    const [a,b,c,d] = indices;
+    const va = arr[a], vb = arr[b], vc = arr[c], vd = arr[d];
+    if (dir > 0) {
+      // a -> b -> c -> d -> a
+      arr[b] = va; arr[c] = vb; arr[d] = vc; arr[a] = vd;
+    } else {
+      // reverse: a -> d -> c -> b -> a
+      arr[d] = va; arr[c] = vd; arr[b] = vc; arr[a] = vb;
+    }
+  }
+
+  function applyMove(name) {
+    const m = MOVES[name];
+    const o = m.face * 9;
+    // Rotate the moved face's own stickers (corners + edges)
+    applyCycle(state, [o+0, o+2, o+8, o+6], m.dir);
+    applyCycle(state, [o+1, o+5, o+7, o+3], m.dir);
+    // Cycle adjacent stickers on the 4 neighbouring faces
+    for (const cyc of m.cycles) applyCycle(state, cyc, m.dir);
+  }
+
+  // ---- Win detection ----
+
+  const LINES = [
+    [0,1,2],[3,4,5],[6,7,8],   // rows
+    [0,3,6],[1,4,7],[2,5,8],   // cols
+    [0,4,8],[2,4,6]            // diagonals
+  ];
+
+  function checkWin() {
+    for (let f = 0; f < 6; f++) {
+      const o = f * 9;
+      for (const [a,b,c] of LINES) {
+        const va = state[o+a];
+        if (va && va === state[o+b] && va === state[o+c]) {
+          return { player: va, cells: [o+a, o+b, o+c] };
+        }
+      }
+    }
+    return null;
+  }
+
+  function isDraw() {
+    return state.every(v => v !== null);
+  }
+
+  // ---- Rendering ----
+
+  function buildCube() {
+    const cube = document.getElementById('cube');
+    cube.innerHTML = '';
+    for (let f = 0; f < 6; f++) {
+      const face = document.createElement('div');
+      face.className = 'face ' + FACE_NAMES[f];
+      face.dataset.face = f;
+      for (let i = 0; i < 9; i++) {
+        const sticker = document.createElement('div');
+        sticker.className = 'sticker';
+        sticker.dataset.face = f;
+        sticker.dataset.idx = i;
+        sticker.addEventListener('click', onStickerClick);
+        face.appendChild(sticker);
+      }
+      cube.appendChild(face);
+    }
+  }
+
+  function renderStickers() {
+    const stickers = document.querySelectorAll('.sticker');
+    stickers.forEach(s => {
+      const f = +s.dataset.face;
+      const i = +s.dataset.idx;
+      const flat = f * 9 + i;
+      const v = state[flat];
+      s.classList.remove('X','O','win');
+      s.textContent = '';
+      if (v === 'X') { s.classList.add('X'); s.textContent = 'X'; }
+      else if (v === 'O') { s.classList.add('O'); s.textContent = 'O'; }
+      if (winningCells.includes(flat)) s.classList.add('win');
+    });
+  }
+
+  function applyCubeRotation() {
+    const cw = document.getElementById('cube-wrapper');
+    cw.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  }
+
+  function updateStatus() {
+    const el = document.getElementById('status');
+    el.classList.remove('x-turn','o-turn','gameover');
+    if (phase === 'gameover') {
+      el.classList.add('gameover');
+      el.textContent = winningCells.length
+        ? `Player ${currentPlayer === 'X' ? '1' : '2'} (${currentPlayer}) wins! 3-in-a-row on a single face.`
+        : `Draw — the cube is full with no winning line.`;
+    } else {
+      el.classList.add(currentPlayer === 'X' ? 'x-turn' : 'o-turn');
+      const num = currentPlayer === 'X' ? '1' : '2';
+      el.textContent = phase === 'place'
+        ? `Player ${num} (${currentPlayer}) — place your mark on any empty sticker`
+        : `Player ${num} (${currentPlayer}) — now make one cube move`;
+    }
+    document.querySelectorAll('.move-btn').forEach(b => {
+      b.disabled = (phase !== 'rotate');
+    });
+  }
+
+  // ---- Event handlers ----
+
+  function onStickerClick(e) {
+    if (dragMoved) return;
+    if (phase !== 'place') return;
+    const f = +e.currentTarget.dataset.face;
+    const i = +e.currentTarget.dataset.idx;
+    const flat = f * 9 + i;
+    if (state[flat] !== null) return;
+    state[flat] = currentPlayer;
+    phase = 'rotate';
+    renderStickers();
+    updateStatus();
+  }
+
+  function onMoveButton(e) {
+    if (phase !== 'rotate') return;
+    const move = e.currentTarget.dataset.move;
+    applyMove(move);
+    const winner = checkWin();
+    if (winner) {
+      winningCells = winner.cells;
+      phase = 'gameover';
+    } else if (isDraw()) {
+      winningCells = [];
+      phase = 'gameover';
+    } else {
+      currentPlayer = (currentPlayer === 'X') ? 'O' : 'X';
+      phase = 'place';
+    }
+    renderStickers();
+    updateStatus();
+  }
+
+  function onRestart() {
+    state = new Array(54).fill(null);
+    currentPlayer = 'X';
+    phase = 'place';
+    winningCells = [];
+    renderStickers();
+    updateStatus();
+  }
+
+  // ---- Drag rotation ----
+
+  function setupDrag() {
+    const scene = document.getElementById('scene');
+    scene.addEventListener('pointerdown', (e) => {
+      isPointerDown = true;
+      dragMoved = false;
+      dragStartX = dragLastX = e.clientX;
+      dragStartY = dragLastY = e.clientY;
+      scene.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!isPointerDown) return;
+      const dx = e.clientX - dragLastX;
+      const dy = e.clientY - dragLastY;
+      dragLastX = e.clientX;
+      dragLastY = e.clientY;
+      const totalDx = e.clientX - dragStartX;
+      const totalDy = e.clientY - dragStartY;
+      if (Math.abs(totalDx) + Math.abs(totalDy) > 5) dragMoved = true;
+      rotY += dx * 0.5;
+      rotX -= dy * 0.5;
+      if (rotX > 89) rotX = 89;
+      if (rotX < -89) rotX = -89;
+      applyCubeRotation();
+    });
+    document.addEventListener('pointerup', () => {
+      if (!isPointerDown) return;
+      isPointerDown = false;
+      scene.classList.remove('dragging');
+    });
+  }
+
+  // ---- Init ----
+
+  function init() {
+    buildCube();
+    renderStickers();
+    applyCubeRotation();
+    setupDrag();
+    document.querySelectorAll('.move-btn').forEach(b => {
+      b.addEventListener('click', onMoveButton);
+    });
+    document.getElementById('restart').addEventListener('click', onRestart);
+    updateStatus();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
